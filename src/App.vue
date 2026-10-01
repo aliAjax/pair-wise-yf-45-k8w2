@@ -22,6 +22,7 @@ const isOnline = computed({
       </div>
       <nav>
         <RouterLink to="/" :class="{ active: route.name === 'schedule' }">◫ {{ t("schedule") }}</RouterLink>
+        <RouterLink to="/reservations" :class="{ active: route.name === 'reservations' }">⏳ {{ t("reservations") }} <em>{{ store.pendingHolds.length }}</em></RouterLink>
         <RouterLink to="/conflicts" :class="{ active: route.name === 'conflicts' }">△ {{ t("conflicts") }} <em>{{ store.conflicts.length }}</em></RouterLink>
         <RouterLink to="/history" :class="{ active: route.name === 'history' }">↺ {{ t("history") }}</RouterLink>
       </nav>
@@ -37,11 +38,16 @@ const isOnline = computed({
           <small>拍摄日 2026-10-08 · 项目《潮汐线》</small>
           <h1>影视剧组通告与资源冲突编排</h1>
         </div>
-        <label class="role-picker">当前角色
-          <select v-model="store.role">
-            <option>制片</option><option>导演</option><option>演员统筹</option><option>场记</option>
-          </select>
-        </label>
+        <div class="topbar-controls">
+          <label class="role-picker">操作人
+            <input v-model="store.operator" placeholder="姓名" />
+          </label>
+          <label class="role-picker">当前角色
+            <select v-model="store.role">
+              <option>制片</option><option>导演</option><option>演员统筹</option><option>场记</option>
+            </select>
+          </label>
+        </div>
       </header>
       <RouterView />
     </main>
