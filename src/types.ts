@@ -1,6 +1,7 @@
 export type Role = "制片" | "导演" | "演员统筹" | "场记";
 export type SceneStatus = "草稿" | "已确认" | "拍摄中" | "已完成";
 export type ConflictType = "演员档期" | "场地占用" | "器材借用" | "转场时间";
+export type ReservationStatus = "预留中" | "已确认" | "已释放" | "已作废";
 
 export interface Talent {
   id: string;
@@ -57,4 +58,52 @@ export interface Version {
 export interface OfflineDraft {
   scenes: Scene[];
   savedAt: string;
+}
+
+export interface TalentSchedule {
+  talentId: string;
+  note: string;
+  updatedAt: string;
+  revision: number;
+}
+
+export interface Reservation {
+  id: string;
+  sceneId: string;
+  sceneCode: string;
+  sceneTitle: string;
+  day: string;
+  start: string;
+  end: string;
+  talentIds: string[];
+  locationId: string;
+  equipmentIds: string[];
+  status: ReservationStatus;
+  heldAt: string;
+  expiresAt: string;
+  confirmedAt: string | null;
+  createdBy: Role;
+  confirmedBy: Role | null;
+  voidReason: string | null;
+  scheduleRevisions: Record<string, number>;
+}
+
+export interface HoldFailure {
+  resourceType: "演员" | "场地" | "器材";
+  resourceName: string;
+  holderScene: string;
+  holderBy: Role;
+  holderStatus: ReservationStatus;
+  holdEndsAt: string | null;
+}
+
+export interface HoldResult {
+  ok: boolean;
+  reservation?: Reservation;
+  failures?: HoldFailure[];
+}
+
+export interface ActionResult {
+  ok: boolean;
+  message: string;
 }

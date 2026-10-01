@@ -1,11 +1,14 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from "vue";
 import dayjs from "dayjs";
+import { ElMessage } from "element-plus";
 import { toTypedSchema } from "@vee-validate/zod";
 import { useForm } from "vee-validate";
 import { z } from "zod";
 import { useScheduleStore } from "../stores/schedule";
 import type { Scene, SceneStatus } from "../types";
+import ReservationPanel from "../components/ReservationPanel.vue";
+import TalentSchedulePanel from "../components/TalentSchedulePanel.vue";
 
 const store = useScheduleStore();
 const saving = ref(false);
@@ -21,6 +24,7 @@ const schema = toTypedSchema(z.object({
 }));
 const { errors, validate } = useForm({ validationSchema: schema });
 const editable = computed(() => store.role === "制片" || store.role === "导演");
+const canSubmit = computed(() => store.role !== "场记");
 const currentStatus = (status: string) => status as SceneStatus;
 
 onMounted(() => store.loadDraft());
@@ -29,9 +33,20 @@ async function submit() {
   const result = await validate({ values: form } as any);
   if (!result.valid) return;
   saving.value = true;
-  store.addScene({ code: form.code, title: form.title, day: form.day, start: form.start, end: form.end, locationId: form.locationId, talentIds: [...form.talentIds], equipmentIds: [...form.equipmentIds] });
-  Object.assign(form, { code: "", title: "", day: "2026-10-08", start: "08:00", end: "10:00", locationId: "l1", talentIds: [], equipmentIds: [] });
-  setTimeout(() => { saving.value = false; }, 240);
+  const hold = store.attemptHold({
+    code: form.code, title: form.title, day: form.day, start: form.start, end: form.end,
+    locationId: form.locationId, talentIds: [...form.talentIds], equipmentIds: [...form.equipmentIds]
+  });
+  saving.value = false;
+  if (hold.ok) {
+    ElMessage.success(`已预留：${form.code} ${form.title}，演员/场地/器材已一起占住，4小时内待制片确认`);
+    Object.assign(form, { code: "", title: "", day: "2026-10-08", start: "08:00", end: "10:00", locationId: "l1", talentIds: [], equipmentIds: [] });
+  } else {
+    const failures = hold.failures ?? [];
+    const head = failures[0];
+    const suffix = failures.length > 1 ? ` 等 ${failures.length} 项资源` : "";
+    ElMessage.error(`预留被退回：${head.resourceType} ${head.resourceName} 已被 ${head.holderScene}（${head.holderBy}·${head.holderStatus}）占着${suffix}`);
+  }
 }
 
 function drop(index: number) {
@@ -45,8 +60,8 @@ function drop(index: number) {
     <div class="metrics">
       <article class="metric"><span>通告场次</span><strong>{{ store.scenes.length }}</strong></article>
       <article class="metric"><span>待处理冲突</span><strong>{{ store.conflicts.length }}</strong></article>
+      <article class="metric"><span>有效预留</span><strong>{{ store.activeHolds.length }}</strong></article>
       <article class="metric"><span>已确认</span><strong>{{ store.scenes.filter((item: Scene) => item.status === '已确认').length }}</strong></article>
-      <article class="metric"><span>版本快照</span><strong>{{ store.versions.length }}</strong></article>
     </div>
     <div v-if="store.draft" class="draft-banner">
       <span>发现 {{ dayjs(store.draft.savedAt).format("MM-DD HH:mm") }} 的离线草稿，共 {{ store.draft.scenes.length }} 个场次。</span>
@@ -64,7 +79,8 @@ function drop(index: number) {
           <label class="field"><span>结束</span><input v-model="form.end" type="time" /></label>
           <label class="field wide"><span>演员档期</span><select v-model="form.talentIds" multiple><option v-for="item in store.talents" :key="item.id" :value="item.id">{{ item.name }} · {{ item.role }}</option></select></label>
           <label class="field wide"><span>器材借用</span><select v-model="form.equipmentIds" multiple><option v-for="item in store.equipment" :key="item.id" :value="item.id">{{ item.name }}</option></select></label>
-          <div class="actions wide"><button class="primary" :disabled="saving || !editable">保存为草稿</button><RouterLink class="secondary" to="/conflicts">检查冲突</RouterLink></div>
+          <div class="actions wide"><button class="primary" :disabled="saving || !canSubmit">提交并预留</button><RouterLink class="secondary" to="/conflicts">检查冲突</RouterLink></div>
+          <small class="muted wide">提交即原子占住演员/场地/器材；没抢到会退回并写明被谁占着。仅制片可确认。</small>
         </form>
       </section>
       <section class="panel">
@@ -85,6 +101,10 @@ function drop(index: number) {
           </article>
         </div>
       </section>
+    </div>
+    <div class="hold-grid">
+      <ReservationPanel />
+      <TalentSchedulePanel />
     </div>
   </section>
 </template>
